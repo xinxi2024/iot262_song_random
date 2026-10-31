@@ -177,7 +177,7 @@
         <ol class="steps">
           <li><span class="step-no">1</span><span>听第一段，想一想歌名。</span></li>
           <li><span class="step-no">2</span><span>还没猜到，可以继续听下一段。</span></li>
-          <li><span class="step-no">3</span><span>点“查看答案”看歌名和歌手。</span></li>
+          <li><span class="step-no">3</span><span>播放时也能暂停、查看答案或跳过本题。</span></li>
         </ol>
         <div class="ready"><span class="ready-dot"></span><span>20 首歌曲已载入</span></div>
         <div class="start-row"><button class="btn btn-primary" id="start">开始游戏</button></div>
@@ -224,6 +224,8 @@
     let clipInProgress = false;
     let clipEndOffset = 0;
     let clipRemainingMs = 0;
+    let audioRequestId = 0;
+    let metadataHandler = null;
     let gameActive = false;
 
     function shuffle(values) {
@@ -286,6 +288,11 @@
     function isTimeExpired() { return secondsLeft !== null && secondsLeft <= 0; }
 
     function stopAudio() {
+      audioRequestId++;
+      if (metadataHandler) {
+        audio.removeEventListener("loadedmetadata", metadataHandler);
+        metadataHandler = null;
+      }
       audio.pause();
       audio.onended = null;
       clearTimeout(clipTimer);
@@ -331,7 +338,7 @@
       }
       if (!clipInProgress || active) return;
       active = true;
-      $("pauseClip").disabled = true;
+      $("pauseClip").disabled = false;
       $("record").classList.add("playing");
       $("pauseClip").textContent = "Ⅱ 暂停";
       $("status").textContent = "继续播放中……";
@@ -431,19 +438,20 @@
     function playClip() {
       if (active || clipInProgress || clipIndex >= 3 || isTimeExpired()) return;
       stopAudio();
+      const requestId = audioRequestId;
       const excerptNumber = clipIndex + 1;
       const offset = clipOrder[clipIndex++] * 10;
       const trackNumber = questionOrder[questionIndex] + 1;
       audio.src = `song_list/web_audio/${String(trackNumber).padStart(2, "0")}.mp3`;
       active = true;
       $("play").disabled = true;
-      $("skip").disabled = true;
-      $("reveal").disabled = true;
       $("record").classList.add("playing");
       $("clipCount").textContent = `正在播放第 ${excerptNumber} / 3 段 · 最长 10 秒`;
       $("status").textContent = "请听旋律……";
 
       const begin = () => {
+        if (requestId !== audioRequestId || !active) return;
+        metadataHandler = null;
         const duration = Math.min(10, Math.max(0, audio.duration - offset));
         if (!duration) {
           stopAudio();
@@ -459,7 +467,7 @@
         clipInProgress = true;
         audio.onended = finishClip;
         $("record").classList.add("playing");
-        $("pauseClip").disabled = true;
+        $("pauseClip").disabled = false;
         $("pauseClip").textContent = "Ⅱ 暂停";
         audio.play().then(() => {
           if (active && clipInProgress) {
@@ -479,7 +487,10 @@
       };
 
       if (audio.readyState >= 1 && audio.src.endsWith(`${String(trackNumber).padStart(2, "0")}.mp3`)) begin();
-      else audio.addEventListener("loadedmetadata", begin, { once: true });
+      else {
+        metadataHandler = begin;
+        audio.addEventListener("loadedmetadata", metadataHandler, { once: true });
+      }
     }
 
     $("start").addEventListener("click", () => {
