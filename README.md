@@ -1,0 +1,28 @@
+# 破冰班会猜歌
+
+一个可离线运行的单页猜歌网站。随机播放 20 首歌，每首歌可听 3 段不同的片段，每段最多 10 秒；答案会显示歌名和歌手。整轮倒计时 10 分钟。
+
+## 使用
+
+双击 `index.html`，点击“开始游戏”。投屏前建议检查电脑音量。
+
+保持以下目录结构，页面才能找到音频：
+
+```text
+index.html
+song_list/
+  web_audio/
+    01.mp3 ... 20.mp3
+```
+
+每首歌的网页音频是从 `song_list` 中的本地 MV/音频抽取的 30 秒片段。网页把每段拆成三个最长 10 秒的小段，并随机安排播放顺序。原始 MV/音频没有放进 GitHub 仓库；网页运行只需要 `web_audio` 里的 20 个 MP3 文件。
+
+## 重新抽取音频片段
+
+把原始文件放回 `song_list/`，安装 `requirements-prepare.txt` 中的工具，然后运行：
+
+```powershell
+python prepare_audio.py
+```
+
+脚本会覆盖生成 `song_list/web_audio/01.mp3` 到 `20.mp3`。

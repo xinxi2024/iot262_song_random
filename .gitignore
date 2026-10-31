@@ -1,0 +1,7 @@
+# Keep the original, large MV/audio files local; commit only the short web-ready clips.
+song_list/*.mkv
+song_list/*.flac
+song_random_website.zip
+site-preview.png
+debug.png
+__pycache__/

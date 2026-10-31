@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#faf9f6">
+  <title>听歌识曲 · 破冰班会</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #faf9f6;
+      --white: #fff;
+      --ink: #282925;
+      --muted: #85867f;
+      --line: #e9e8e2;
+      --soft: #f3f2ed;
+      --accent: #b65e50;
+      --accent-dark: #91493e;
+      --green: #617a68;
+      --shadow: 0 18px 50px #29271d0a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: "Aptos", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    button { font: inherit; cursor: pointer; }
+    .page { max-width: 1060px; margin: 0 auto; padding: 28px 28px 54px; }
+    .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 23px; border-bottom: 1px solid var(--line); }
+    .logo { display: flex; align-items: center; gap: 11px; font-size: 13px; font-weight: 750; letter-spacing: .11em; }
+    .logo-mark { display: grid; place-items: center; width: 31px; height: 31px; color: var(--accent); border: 1px solid #e5c8c0; border-radius: 50%; font-size: 16px; }
+    .header-note { color: var(--muted); font-size: 13px; }
+    .hero { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 24px; padding: 57px 0 34px; }
+    .eyebrow { color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .17em; text-transform: uppercase; }
+    h1 { margin: 12px 0 12px; font-family: "Georgia", "Songti SC", "SimSun", serif; font-size: clamp(36px, 5.4vw, 59px); font-weight: 500; letter-spacing: -.045em; line-height: 1.1; }
+    .intro { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
+    .hero-tag { align-self: center; padding: 10px 14px; color: var(--green); border: 1px solid #dce4dd; border-radius: 99px; background: #f5f7f4; font-size: 12px; white-space: nowrap; }
+    .game-shell { display: grid; grid-template-columns: minmax(0, 1fr) 255px; gap: 18px; align-items: stretch; }
+    .game-card, .side-card { border: 1px solid var(--line); border-radius: 20px; background: var(--white); box-shadow: var(--shadow); }
+    .game-card { min-height: 476px; padding: 31px clamp(22px, 5vw, 54px) 26px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .question-meta { align-self: stretch; display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .question-meta strong { color: var(--ink); font-weight: 700; }
+    .record { position: relative; width: 142px; height: 142px; margin: 32px auto 24px; display: grid; place-items: center; border: 1px solid #e7e4de; border-radius: 50%; background: repeating-radial-gradient(circle, #fff 0 8px, #f0efea 9px 10px); box-shadow: inset 0 0 0 19px #fff, 0 0 0 9px #f7f6f2; }
+    .record::before { content: ""; position: absolute; inset: 38px; border: 1px solid #eed5ce; border-radius: 50%; background: #f8eeeb; }
+    .record span { position: relative; z-index: 1; color: var(--accent); font-size: 26px; }
+    .record.playing { animation: rotate 6s linear infinite; }
+    @keyframes rotate { to { transform: rotate(360deg); } }
+    .status { min-height: 24px; color: var(--muted); font-size: 14px; }
+    .clip-count { min-height: 23px; margin-top: 7px; color: var(--green); font-size: 12px; }
+    .actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 9px; margin: 21px 0 18px; }
+    .btn { min-height: 44px; padding: 0 17px; border: 1px solid transparent; border-radius: 11px; transition: background .15s ease, border-color .15s ease, transform .15s ease; }
+    .btn:hover:not(:disabled) { transform: translateY(-1px); }
+    .btn:disabled { opacity: .42; cursor: not-allowed; }
+    .btn-primary { color: #fff; background: var(--accent); }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-dark); }
+    .btn-secondary { color: var(--ink); border-color: var(--line); background: #fff; }
+    .btn-secondary:hover:not(:disabled) { background: var(--soft); }
+    .btn-quiet { color: var(--muted); background: transparent; }
+    .answer { min-height: 52px; margin: 0 0 3px; }
+    .answer-title { font-family: "Georgia", "Songti SC", "SimSun", serif; font-size: 25px; font-weight: 600; }
+    .answer-artist { margin-top: 4px; color: var(--muted); font-size: 13px; }
+    .answer.hidden { visibility: hidden; }
+    .hint { min-height: 20px; color: var(--muted); font-size: 12px; }
+    .next-row { min-height: 48px; margin-top: 7px; }
+    .side-card { padding: 23px 21px; }
+    .timer-label { color: var(--muted); font-size: 12px; letter-spacing: .04em; }
+    .timer { margin: 7px 0 14px; font-size: 35px; line-height: 1; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+    .timer.urgent { color: var(--accent); }
+    .timer-track { height: 4px; overflow: hidden; border-radius: 10px; background: #eeede8; }
+    .timer-track span { display: block; width: 100%; height: 100%; background: #a8b7a9; transition: width .5s linear; }
+    .side-divider { height: 1px; margin: 21px 0; background: var(--line); }
+    .side-title { margin: 0 0 14px; font-size: 13px; font-weight: 750; }
+    .steps { display: grid; gap: 13px; margin: 0; padding: 0; list-style: none; }
+    .steps li { display: grid; grid-template-columns: 23px 1fr; align-items: start; gap: 9px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    .step-no { display: grid; place-items: center; width: 22px; height: 22px; color: var(--accent); border-radius: 50%; background: #f8eeeb; font-size: 11px; font-weight: 750; }
+    .ready { display: flex; align-items: center; gap: 8px; color: var(--green); font-size: 12px; }
+    .ready-dot { width: 7px; height: 7px; border-radius: 50%; background: #78957e; }
+    .start-row { margin-top: 19px; }
+    .start-row .btn { width: 100%; }
+    .foot { padding-top: 20px; color: #99978e; font-size: 11px; text-align: center; }
+    .hidden-el { display: none !important; }
+    @media (max-width: 760px) {
+      .page { padding: 20px 16px 38px; }
+      .hero { padding: 40px 0 26px; }
+      .game-shell { grid-template-columns: 1fr; }
+      .game-card { min-height: 455px; }
+      .side-card { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 24px; }
+      .timer-area { grid-row: span 2; }
+      .side-divider { display: none; }
+      .side-title { grid-column: 2; margin-bottom: 0; }
+      .steps { grid-column: 2; }
+      .ready, .start-row { grid-column: 1; }
+      .ready { grid-row: 2; }
+      .start-row { grid-row: 3; }
+    }
+    @media (max-width: 520px) {
+      .header-note { display: none; }
+      .hero { display: block; padding-top: 34px; }
+      .hero-tag { display: inline-block; margin-top: 18px; }
+      .game-card { padding: 24px 17px; }
+      .record { margin-top: 27px; }
+      .side-card { display: block; }
+      .side-title { margin-top: 18px; }
+      .steps { margin-top: 13px; }
+      .ready { margin-top: 18px; }
+      .start-row { margin-top: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <div class="logo"><span class="logo-mark">♫</span><span>破冰班会 · 猜歌</span></div>
+      <div class="header-note">简简单单，听听熟悉的歌</div>
+    </header>
+
+    <section class="hero">
+      <div>
+        <div class="eyebrow">A LITTLE MUSIC GAME</div>
+        <h1>听见旋律，想起歌名。</h1>
+        <p class="intro">随机听一段歌，和同学一起猜猜它的名字。</p>
+      </div>
+      <div class="hero-tag">20 首歌 · 最多 10 分钟</div>
+    </section>
+
+    <section class="game-shell" aria-label="猜歌游戏">
+      <div class="game-card" aria-live="polite">
+        <div class="question-meta"><span id="round">尚未开始</span><span id="roundState">准备就绪</span></div>
+        <div class="record" id="record" aria-hidden="true"><span>♫</span></div>
+        <div class="status" id="status">开始后会随机播放一首歌。</div>
+        <div class="clip-count" id="clipCount">每首歌最多 3 段，每段不超过 10 秒</div>
+        <div class="actions">
+          <button class="btn btn-primary" id="play" disabled>▶ 播放片段 1 / 3</button>
+          <button class="btn btn-secondary" id="reveal" disabled>查看答案</button>
+          <button class="btn btn-quiet" id="skip" disabled>跳过本题</button>
+        </div>
+        <div class="answer hidden" id="answer">
+          <div class="answer-title" id="answerTitle"></div>
+          <div class="answer-artist" id="answerArtist"></div>
+        </div>
+        <div class="hint" id="hint">看答案后可以继续下一题。</div>
+        <div class="next-row"><button class="btn btn-secondary hidden-el" id="next">下一题 →</button></div>
+      </div>
+
+      <aside class="side-card">
+        <div class="timer-area">
+          <div class="timer-label">本轮剩余时间</div>
+          <div class="timer" id="timer">10:00</div>
+          <div class="timer-track"><span id="timerBar"></span></div>
+        </div>
+        <div class="side-divider"></div>
+        <h2 class="side-title">游戏方式</h2>
+        <ol class="steps">
+          <li><span class="step-no">1</span><span>听第一段，想一想歌名。</span></li>
+          <li><span class="step-no">2</span><span>还没猜到，可以继续听下一段。</span></li>
+          <li><span class="step-no">3</span><span>点“查看答案”看歌名和歌手。</span></li>
+        </ol>
+        <div class="ready"><span class="ready-dot"></span><span>20 首歌曲已载入</span></div>
+        <div class="start-row"><button class="btn btn-primary" id="start">开始游戏</button></div>
+      </aside>
+    </section>
+    <footer class="foot">投屏前请检查音量。音频已整理为网页兼容格式，网站可离线运行。</footer>
+  </main>
+  <audio id="audio" preload="auto"></audio>
+
+  <script>
+    const songs = [
+      { title: "如果可以", artist: "韦礼安" },
+      { title: "红尘客栈", artist: "周杰伦" },
+      { title: "几分之几", artist: "卢广仲" },
+      { title: "一样的月光", artist: "徐佳莹" },
+      { title: "特别的人", artist: "方大同" },
+      { title: "紧急联络人", artist: "Gareth.T" },
+      { title: "红豆", artist: "王菲" },
+      { title: "我怀念的", artist: "孙燕姿" },
+      { title: "爱爱爱", artist: "方大同" },
+      { title: "蝴蝶", artist: "陶喆" },
+      { title: "修炼爱情", artist: "林俊杰" },
+      { title: "暖暖", artist: "梁静茹" },
+      { title: "一半一半", artist: "Top Barry & INDECOMPANY" },
+      { title: "水星记", artist: "郭顶" },
+      { title: "幻听", artist: "许嵩" },
+      { title: "刻在我心底的名字", artist: "卢广仲" },
+      { title: "当你", artist: "王心凌" },
+      { title: "才二十三", artist: "方大同" },
+      { title: "小镇姑娘", artist: "陶喆" },
+      { title: "最佳损友", artist: "陈奕迅" }
+    ];
+    const $ = id => document.getElementById(id);
+    const audio = $("audio");
+    let questionOrder = [];
+    let questionIndex = 0;
+    let clipOrder = [];
+    let clipIndex = 0;
+    let secondsLeft = 600;
+    let gameTimer = null;
+    let clipTimer = null;
+    let active = false;
+
+    function shuffle(values) {
+      const copy = [...values];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function currentSong() { return songs[questionOrder[questionIndex]]; }
+
+    function stopAudio() {
+      audio.pause();
+      clearTimeout(clipTimer);
+      active = false;
+      $("record").classList.remove("playing");
+    }
+
+    function showTimer() {
+      const minutes = Math.floor(secondsLeft / 60);
+      const seconds = secondsLeft % 60;
+      $("timer").textContent = `${minutes}:${String(seconds).padStart(2, "0")}`;
+      $("timerBar").style.width = `${secondsLeft / 6}%`;
+      $("timer").classList.toggle("urgent", secondsLeft <= 60);
+      if (secondsLeft <= 0) finishGame(true);
+    }
+
+    function showQuestion() {
+      stopAudio();
+      clipOrder = shuffle([0, 1, 2]);
+      clipIndex = 0;
+      const current = currentSong();
+      $("round").textContent = `第 ${String(questionIndex + 1).padStart(2, "0")} 题 / ${questionOrder.length}`;
+      $("roundState").textContent = "听歌猜名";
+      $("status").textContent = "准备好了吗？";
+      $("clipCount").textContent = "每首歌最多 3 段，每段不超过 10 秒";
+      $("answerTitle").textContent = current.title;
+      $("answerArtist").textContent = current.artist;
+      $("answer").classList.add("hidden");
+      $("play").disabled = secondsLeft <= 0;
+      $("play").textContent = "▶ 播放片段 1 / 3";
+      $("reveal").disabled = false;
+      $("skip").disabled = false;
+      $("next").classList.add("hidden-el");
+      $("hint").textContent = "看答案后可以继续下一题。";
+    }
+
+    function showAnswer(message = "答案已揭晓") {
+      stopAudio();
+      $("answer").classList.remove("hidden");
+      $("roundState").textContent = "答案揭晓";
+      $("status").textContent = message;
+      $("play").disabled = true;
+      $("reveal").disabled = true;
+      $("skip").disabled = true;
+      $("next").classList.remove("hidden-el");
+      $("hint").textContent = "准备好了就进入下一题。";
+    }
+
+    function finishGame(timeExpired = false) {
+      clearInterval(gameTimer);
+      stopAudio();
+      $("play").disabled = true;
+      $("reveal").disabled = true;
+      $("skip").disabled = true;
+      $("next").classList.add("hidden-el");
+      $("answer").classList.remove("hidden");
+      if (timeExpired) {
+        $("roundState").textContent = "时间到";
+        $("status").textContent = "本轮 10 分钟结束。";
+        $("hint").textContent = "点击“重新开始”可以再玩一轮。";
+      } else {
+        $("roundState").textContent = "全部完成";
+        $("status").textContent = "20 首歌都听完啦。";
+        $("hint").textContent = "点击“重新开始”可以再玩一轮。";
+      }
+      $("answerTitle").textContent = "本轮结束";
+      $("answerArtist").textContent = "谢谢参与";
+      $("start").textContent = "重新开始";
+    }
+
+    function playClip() {
+      if (active || clipIndex >= 3 || secondsLeft <= 0) return;
+      stopAudio();
+      const excerptNumber = clipIndex + 1;
+      const offset = clipOrder[clipIndex++] * 10;
+      const trackNumber = questionOrder[questionIndex] + 1;
+      audio.src = `song_list/web_audio/${String(trackNumber).padStart(2, "0")}.mp3`;
+      active = true;
+      $("play").disabled = true;
+      $("skip").disabled = true;
+      $("reveal").disabled = true;
+      $("record").classList.add("playing");
+      $("clipCount").textContent = `正在播放第 ${excerptNumber} / 3 段 · 最长 10 秒`;
+      $("status").textContent = "请听旋律……";
+
+      const onFinished = () => {
+        stopAudio();
+        $("reveal").disabled = false;
+        $("skip").disabled = false;
+        $("play").disabled = clipIndex >= 3;
+        $("play").textContent = clipIndex >= 3 ? "三段已播放" : `▶ 播放片段 ${clipIndex + 1} / 3`;
+        $("clipCount").textContent = clipIndex >= 3 ? "三段片段已听完" : `已听 ${clipIndex} / 3 段 · 每段最长 10 秒`;
+        $("status").textContent = clipIndex >= 3 ? "还记得歌名吗？" : "要继续听，还是查看答案？";
+      };
+
+      const begin = () => {
+        const duration = Math.min(10, Math.max(0, audio.duration - offset));
+        if (!duration) {
+          stopAudio();
+          $("status").textContent = "这段音频无法播放，请检查网站音频文件。";
+          $("play").disabled = false;
+          $("reveal").disabled = false;
+          $("skip").disabled = false;
+          return;
+        }
+        audio.currentTime = offset;
+        clipTimer = setTimeout(onFinished, duration * 1000);
+        audio.onended = onFinished;
+        audio.play().catch(() => {
+          stopAudio();
+          $("status").textContent = "播放失败，请确认 song_list/web_audio 文件夹仍在网站旁边。";
+          $("play").disabled = false;
+          $("reveal").disabled = false;
+          $("skip").disabled = false;
+          clipIndex--;
+        });
+      };
+
+      if (audio.readyState >= 1 && audio.src.endsWith(`${String(trackNumber).padStart(2, "0")}.mp3`)) begin();
+      else audio.addEventListener("loadedmetadata", begin, { once: true });
+    }
+
+    $("start").addEventListener("click", () => {
+      clearInterval(gameTimer);
+      questionOrder = shuffle(songs.map((_, index) => index));
+      questionIndex = 0;
+      secondsLeft = 600;
+      $("start").textContent = "重新开始";
+      showTimer();
+      showQuestion();
+      gameTimer = setInterval(() => { secondsLeft--; showTimer(); }, 1000);
+    });
+    $("play").addEventListener("click", playClip);
+    $("reveal").addEventListener("click", () => showAnswer());
+    $("skip").addEventListener("click", () => showAnswer("跳过本题，答案是……"));
+    $("next").addEventListener("click", () => {
+      if (questionIndex >= questionOrder.length - 1) finishGame(false);
+      else if (secondsLeft > 0) {
+        questionIndex++;
+        showQuestion();
+      }
+    });
+  </script>
+</body>
+</html>
