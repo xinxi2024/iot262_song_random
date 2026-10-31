@@ -140,6 +140,7 @@
         <div class="clip-count" id="clipCount">每首歌最多 3 段，每段不超过 10 秒</div>
         <div class="actions">
           <button class="btn btn-primary" id="play" disabled>▶ 播放片段 1 / 3</button>
+          <button class="btn btn-secondary" id="pauseClip" disabled>Ⅱ 暂停</button>
           <button class="btn btn-secondary" id="reveal" disabled>查看答案</button>
           <button class="btn btn-quiet" id="skip" disabled>跳过本题</button>
         </div>
@@ -220,6 +221,9 @@
     let gameTimer = null;
     let clipTimer = null;
     let active = false;
+    let clipInProgress = false;
+    let clipEndOffset = 0;
+    let clipRemainingMs = 0;
     let gameActive = false;
 
     function shuffle(values) {
@@ -283,9 +287,68 @@
 
     function stopAudio() {
       audio.pause();
+      audio.onended = null;
       clearTimeout(clipTimer);
+      clipTimer = null;
       active = false;
+      clipInProgress = false;
+      clipRemainingMs = 0;
       $("record").classList.remove("playing");
+      $("pauseClip").disabled = true;
+      $("pauseClip").textContent = "Ⅱ 暂停";
+    }
+
+    function finishClip() {
+      if (!clipInProgress) return;
+      audio.pause();
+      clearTimeout(clipTimer);
+      clipTimer = null;
+      active = false;
+      clipInProgress = false;
+      clipRemainingMs = 0;
+      $("record").classList.remove("playing");
+      $("pauseClip").disabled = true;
+      $("pauseClip").textContent = "Ⅱ 暂停";
+      $("reveal").disabled = false;
+      $("skip").disabled = false;
+      $("play").disabled = clipIndex >= 3;
+      $("play").textContent = clipIndex >= 3 ? "三段已播放" : `▶ 播放片段 ${clipIndex + 1} / 3`;
+      $("clipCount").textContent = clipIndex >= 3 ? "三段片段已听完" : `已听 ${clipIndex} / 3 段 · 每段最长 10 秒`;
+      $("status").textContent = clipIndex >= 3 ? "还记得歌名吗？" : "要继续听，还是查看答案？";
+    }
+
+    function toggleClipPlayback() {
+      if (active && clipInProgress) {
+        audio.pause();
+        clearTimeout(clipTimer);
+        clipTimer = null;
+        clipRemainingMs = Math.max(0, (clipEndOffset - audio.currentTime) * 1000);
+        active = false;
+        $("record").classList.remove("playing");
+        $("pauseClip").textContent = "▶ 继续播放";
+        $("status").textContent = "已暂停，点击“继续播放”接着听这一段。";
+        return;
+      }
+      if (!clipInProgress || active) return;
+      active = true;
+      $("pauseClip").disabled = true;
+      $("record").classList.add("playing");
+      $("pauseClip").textContent = "Ⅱ 暂停";
+      $("status").textContent = "继续播放中……";
+      audio.play().then(() => {
+        if (active && clipInProgress) {
+          clipRemainingMs = Math.max(0, (clipEndOffset - audio.currentTime) * 1000);
+          clipTimer = setTimeout(finishClip, clipRemainingMs);
+          $("pauseClip").disabled = false;
+        }
+      }).catch(() => {
+        if (!active || !clipInProgress) return;
+        active = false;
+        $("record").classList.remove("playing");
+        $("pauseClip").disabled = false;
+        $("pauseClip").textContent = "▶ 继续播放";
+        $("status").textContent = "无法继续播放，请再试一次。";
+      });
     }
 
     function showTimer() {
@@ -320,6 +383,8 @@
       $("answer").classList.add("hidden");
       $("play").disabled = isTimeExpired();
       $("play").textContent = "▶ 播放片段 1 / 3";
+      $("pauseClip").disabled = true;
+      $("pauseClip").textContent = "Ⅱ 暂停";
       $("reveal").disabled = false;
       $("skip").disabled = false;
       $("next").classList.add("hidden-el");
@@ -364,7 +429,7 @@
     }
 
     function playClip() {
-      if (active || clipIndex >= 3 || isTimeExpired()) return;
+      if (active || clipInProgress || clipIndex >= 3 || isTimeExpired()) return;
       stopAudio();
       const excerptNumber = clipIndex + 1;
       const offset = clipOrder[clipIndex++] * 10;
@@ -378,16 +443,6 @@
       $("clipCount").textContent = `正在播放第 ${excerptNumber} / 3 段 · 最长 10 秒`;
       $("status").textContent = "请听旋律……";
 
-      const onFinished = () => {
-        stopAudio();
-        $("reveal").disabled = false;
-        $("skip").disabled = false;
-        $("play").disabled = clipIndex >= 3;
-        $("play").textContent = clipIndex >= 3 ? "三段已播放" : `▶ 播放片段 ${clipIndex + 1} / 3`;
-        $("clipCount").textContent = clipIndex >= 3 ? "三段片段已听完" : `已听 ${clipIndex} / 3 段 · 每段最长 10 秒`;
-        $("status").textContent = clipIndex >= 3 ? "还记得歌名吗？" : "要继续听，还是查看答案？";
-      };
-
       const begin = () => {
         const duration = Math.min(10, Math.max(0, audio.duration - offset));
         if (!duration) {
@@ -399,9 +454,21 @@
           return;
         }
         audio.currentTime = offset;
-        clipTimer = setTimeout(onFinished, duration * 1000);
-        audio.onended = onFinished;
-        audio.play().catch(() => {
+        clipEndOffset = offset + duration;
+        clipRemainingMs = duration * 1000;
+        clipInProgress = true;
+        audio.onended = finishClip;
+        $("record").classList.add("playing");
+        $("pauseClip").disabled = true;
+        $("pauseClip").textContent = "Ⅱ 暂停";
+        audio.play().then(() => {
+          if (active && clipInProgress) {
+            clipRemainingMs = Math.max(0, (clipEndOffset - audio.currentTime) * 1000);
+            clipTimer = setTimeout(finishClip, clipRemainingMs);
+            $("pauseClip").disabled = false;
+          }
+        }).catch(() => {
+          if (!active || !clipInProgress) return;
           stopAudio();
           $("status").textContent = "播放失败，请确认 song_list/web_audio 文件夹仍在网站旁边。";
           $("play").disabled = false;
@@ -437,6 +504,7 @@
       if (secondsLeft !== null) gameTimer = setInterval(() => { secondsLeft--; showTimer(); }, 1000);
     });
     $("play").addEventListener("click", playClip);
+    $("pauseClip").addEventListener("click", toggleClipPlayback);
     $("reveal").addEventListener("click", () => showAnswer());
     $("skip").addEventListener("click", () => showAnswer("跳过本题，答案是……"));
     $("next").addEventListener("click", () => {
