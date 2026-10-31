@@ -68,6 +68,11 @@
     .next-row { min-height: 48px; margin-top: 7px; }
     .side-card { padding: 23px 21px; }
     .timer-label { color: var(--muted); font-size: 12px; letter-spacing: .04em; }
+    .duration-select, .custom-minutes { width: 100%; min-height: 39px; margin-top: 9px; padding: 0 10px; color: var(--ink); border: 1px solid var(--line); border-radius: 9px; background: #fff; font: inherit; font-size: 13px; }
+    .custom-minutes { width: 86px; min-height: 34px; margin: 0 6px; text-align: center; }
+    .custom-duration { display: flex; align-items: center; justify-content: space-between; margin-top: 9px; color: var(--muted); font-size: 12px; }
+    .timer-hint { margin-top: 8px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .duration-error { min-height: 16px; margin-top: 4px; color: var(--accent); font-size: 11px; }
     .timer { margin: 7px 0 14px; font-size: 35px; line-height: 1; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
     .timer.urgent { color: var(--accent); }
     .timer-track { height: 4px; overflow: hidden; border-radius: 10px; background: #eeede8; }
@@ -124,7 +129,7 @@
         <h1>听见旋律，想起歌名。</h1>
         <p class="intro">随机听一段歌，和同学一起猜猜它的名字。</p>
       </div>
-      <div class="hero-tag">20 首歌 · 最多 10 分钟</div>
+      <div class="hero-tag">20 首歌 · 时长由你决定</div>
     </section>
 
     <section class="game-shell" aria-label="猜歌游戏">
@@ -148,9 +153,23 @@
 
       <aside class="side-card">
         <div class="timer-area">
-          <div class="timer-label">本轮剩余时间</div>
+          <div class="timer-label" id="timerLabel">本轮时长</div>
+          <select class="duration-select" id="durationMode" aria-label="选择本轮时长">
+            <option value="5">5 分钟</option>
+            <option value="10" selected>10 分钟</option>
+            <option value="15">15 分钟</option>
+            <option value="20">20 分钟</option>
+            <option value="30">30 分钟</option>
+            <option value="custom">自定义时长</option>
+            <option value="unlimited">无时间限制</option>
+          </select>
+          <label class="custom-duration hidden-el" id="customDurationBox">自定义分钟数
+            <span><input class="custom-minutes" id="customMinutes" type="number" min="1" max="180" step="1" value="10" aria-label="自定义分钟数">分钟</span>
+          </label>
+          <div class="duration-error" id="durationError" aria-live="polite"></div>
           <div class="timer" id="timer">10:00</div>
-          <div class="timer-track"><span id="timerBar"></span></div>
+          <div class="timer-track" id="timerTrack"><span id="timerBar"></span></div>
+          <div class="timer-hint" id="timerHint">倒计时从开始游戏时启动。</div>
         </div>
         <div class="side-divider"></div>
         <h2 class="side-title">游戏方式</h2>
@@ -197,9 +216,11 @@
     let clipOrder = [];
     let clipIndex = 0;
     let secondsLeft = 600;
+    let timeLimitSeconds = 600;
     let gameTimer = null;
     let clipTimer = null;
     let active = false;
+    let gameActive = false;
 
     function shuffle(values) {
       const copy = [...values];
@@ -212,6 +233,54 @@
 
     function currentSong() { return songs[questionOrder[questionIndex]]; }
 
+    function formatTime(totalSeconds) {
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}:${String(seconds).padStart(2, "0")}`;
+    }
+
+    function getSelectedTimeLimit() {
+      const mode = $("durationMode").value;
+      if (mode === "unlimited") return null;
+      if (mode === "custom") {
+        const minutes = Number($("customMinutes").value);
+        if (!Number.isInteger(minutes) || minutes < 1 || minutes > 180) return NaN;
+        return minutes * 60;
+      }
+      return Number(mode) * 60;
+    }
+
+    function updateDurationSetting() {
+      const isCustom = $("durationMode").value === "custom";
+      $("customDurationBox").classList.toggle("hidden-el", !isCustom);
+      $("durationError").textContent = "";
+      if (gameActive) {
+        $("timerHint").textContent = "新时长将在重新开始后生效。";
+        return;
+      }
+      const selected = getSelectedTimeLimit();
+      if (selected === null) {
+        $("timerLabel").textContent = "本轮时长";
+        $("timer").textContent = "∞";
+        $("timerTrack").classList.add("hidden-el");
+        $("timer").classList.remove("urgent");
+        $("timerHint").textContent = "无倒计时，答完所有歌曲即可结束。";
+      } else if (Number.isFinite(selected)) {
+        $("timerLabel").textContent = "本轮时长";
+        $("timer").textContent = formatTime(selected);
+        $("timerTrack").classList.remove("hidden-el");
+        $("timerBar").style.width = "100%";
+        $("timer").classList.remove("urgent");
+        $("timerHint").textContent = "倒计时从开始游戏时启动。";
+      } else {
+        $("timer").textContent = "—:—";
+        $("timerTrack").classList.add("hidden-el");
+        $("durationError").textContent = "请输入 1–180 的整数分钟。";
+      }
+    }
+
+    function isTimeExpired() { return secondsLeft !== null && secondsLeft <= 0; }
+
     function stopAudio() {
       audio.pause();
       clearTimeout(clipTimer);
@@ -220,11 +289,20 @@
     }
 
     function showTimer() {
-      const minutes = Math.floor(secondsLeft / 60);
-      const seconds = secondsLeft % 60;
-      $("timer").textContent = `${minutes}:${String(seconds).padStart(2, "0")}`;
-      $("timerBar").style.width = `${secondsLeft / 6}%`;
+      if (secondsLeft === null) {
+        $("timerLabel").textContent = "本轮时长";
+        $("timer").textContent = "∞";
+        $("timerTrack").classList.add("hidden-el");
+        $("timer").classList.remove("urgent");
+        $("timerHint").textContent = "无倒计时，答完所有歌曲即可结束。";
+        return;
+      }
+      $("timerLabel").textContent = gameActive ? "剩余时间" : "本轮时长";
+      $("timer").textContent = formatTime(secondsLeft);
+      $("timerTrack").classList.remove("hidden-el");
+      $("timerBar").style.width = `${Math.max(0, secondsLeft / timeLimitSeconds * 100)}%`;
       $("timer").classList.toggle("urgent", secondsLeft <= 60);
+      $("timerHint").textContent = "倒计时从开始游戏时启动。";
       if (secondsLeft <= 0) finishGame(true);
     }
 
@@ -240,7 +318,7 @@
       $("answerTitle").textContent = current.title;
       $("answerArtist").textContent = current.artist;
       $("answer").classList.add("hidden");
-      $("play").disabled = secondsLeft <= 0;
+      $("play").disabled = isTimeExpired();
       $("play").textContent = "▶ 播放片段 1 / 3";
       $("reveal").disabled = false;
       $("skip").disabled = false;
@@ -262,7 +340,10 @@
 
     function finishGame(timeExpired = false) {
       clearInterval(gameTimer);
+      gameTimer = null;
       stopAudio();
+      gameActive = false;
+      $("timerLabel").textContent = timeExpired ? "计时结束" : "本轮用时";
       $("play").disabled = true;
       $("reveal").disabled = true;
       $("skip").disabled = true;
@@ -270,7 +351,7 @@
       $("answer").classList.remove("hidden");
       if (timeExpired) {
         $("roundState").textContent = "时间到";
-        $("status").textContent = "本轮 10 分钟结束。";
+        $("status").textContent = "本轮时间结束。";
         $("hint").textContent = "点击“重新开始”可以再玩一轮。";
       } else {
         $("roundState").textContent = "全部完成";
@@ -283,7 +364,7 @@
     }
 
     function playClip() {
-      if (active || clipIndex >= 3 || secondsLeft <= 0) return;
+      if (active || clipIndex >= 3 || isTimeExpired()) return;
       stopAudio();
       const excerptNumber = clipIndex + 1;
       const offset = clipOrder[clipIndex++] * 10;
@@ -335,25 +416,38 @@
     }
 
     $("start").addEventListener("click", () => {
+      const selectedLimit = getSelectedTimeLimit();
+      if (Number.isNaN(selectedLimit)) {
+        $("durationError").textContent = "请输入 1–180 的整数分钟。";
+        $("customMinutes").focus();
+        return;
+      }
       clearInterval(gameTimer);
+      gameTimer = null;
       questionOrder = shuffle(songs.map((_, index) => index));
       questionIndex = 0;
-      secondsLeft = 600;
+      timeLimitSeconds = selectedLimit;
+      secondsLeft = selectedLimit;
+      gameActive = true;
+      $("timerLabel").textContent = "剩余时间";
+      $("durationError").textContent = "";
       $("start").textContent = "重新开始";
       showTimer();
       showQuestion();
-      gameTimer = setInterval(() => { secondsLeft--; showTimer(); }, 1000);
+      if (secondsLeft !== null) gameTimer = setInterval(() => { secondsLeft--; showTimer(); }, 1000);
     });
     $("play").addEventListener("click", playClip);
     $("reveal").addEventListener("click", () => showAnswer());
     $("skip").addEventListener("click", () => showAnswer("跳过本题，答案是……"));
     $("next").addEventListener("click", () => {
       if (questionIndex >= questionOrder.length - 1) finishGame(false);
-      else if (secondsLeft > 0) {
+      else if (!isTimeExpired()) {
         questionIndex++;
         showQuestion();
       }
     });
+    $("durationMode").addEventListener("change", updateDurationSetting);
+    $("customMinutes").addEventListener("input", updateDurationSetting);
   </script>
 </body>
 </html>
